@@ -1,0 +1,9 @@
+node_modules/
+.env
+output/
+assets/musica/
+assets/yt_tokens.json
+assets/vozes.json
+*.mp3
+*.mp4
+*.log
