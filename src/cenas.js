@@ -437,11 +437,16 @@ async function gerarCenaAbertura(roteiro, outputDir) {
   ctx.textAlign = 'center';
   ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.font = 'bold 24px Arial';
   ctx.fillText('HISTÓRIA ILUSTRADA', W/2, y0+50);
+  // Glow no título da abertura
+  ctx.shadowColor = p.acc; ctx.shadowBlur = 40;
   ctx.fillStyle = p.acc;
   ctx.font = `bold ${roteiro.titulo.length > 22 ? 60 : 74}px Arial`;
   ctx.fillText((roteiro.titulo.length>36?roteiro.titulo.slice(0,33)+'…':roteiro.titulo).toUpperCase(), W/2, y0+118);
+  ctx.shadowBlur = 0;
   ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.font = '38px Arial';
   ctx.fillText(`por ${roteiro.autor}`, W/2, y0+174);
+  ctx.fillStyle = p.acc + '99'; ctx.font = 'bold 22px Arial';
+  ctx.fillText('RESUMO FÁCIL', W/2, y0+230);
 
   const out = join(outputDir, 'cenas', 'cena_00_abertura.png');
   await writeFile(out, await canvas.encode('png'));
@@ -511,12 +516,115 @@ async function gerarCenaSegmento(seg, index, total, outputDir) {
   return out;
 }
 
+// ── Slide de Intro (3s) — logo + tagline do canal ────────────────────────────
+async function gerarCenaIntro(roteiro, outputDir) {
+  const canvas = createCanvas(W, H);
+  const ctx    = canvas.getContext('2d');
+  const p      = PALETAS[0];
+
+  // Fundo com gradiente diagonal
+  const bg = ctx.createLinearGradient(0, 0, W, H);
+  bg.addColorStop(0, '#05050F'); bg.addColorStop(1, '#1A0D2E');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+  // Círculo decorativo grande semi-transparente
+  const gc = ctx.createRadialGradient(W * 0.78, H * 0.3, 0, W * 0.78, H * 0.3, 480);
+  gc.addColorStop(0, p.acc + '20'); gc.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = gc; ctx.beginPath(); ctx.arc(W * 0.78, H * 0.3, 480, 0, Math.PI * 2); ctx.fill();
+
+  // Ícone do livro (desenhado via canvas)
+  const cx = W * 0.5, cy = H * 0.38;
+  ctx.shadowColor = p.acc; ctx.shadowBlur = 50;
+  ctx.fillStyle = p.acc + 'DD';
+  ctx.beginPath(); ctx.moveTo(cx, cy - 80); ctx.lineTo(cx - 100, cy + 60); ctx.lineTo(cx, cy + 48); ctx.fill();
+  ctx.fillStyle = (p.acc + 'AA');
+  ctx.beginPath(); ctx.moveTo(cx, cy - 80); ctx.lineTo(cx + 100, cy + 60); ctx.lineTo(cx, cy + 48); ctx.fill();
+  ctx.fillStyle = p.acc; ctx.fillRect(cx - 3, cy - 80, 6, 130);
+  ctx.shadowBlur = 0;
+
+  // Nome do canal
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#FFFFFF'; ctx.font = 'bold 86px Arial';
+  ctx.shadowColor = p.acc; ctx.shadowBlur = 20;
+  ctx.fillText('RESUMO FÁCIL', W / 2, H * 0.70);
+  ctx.shadowBlur = 0;
+
+  // Tagline
+  ctx.fillStyle = p.acc + 'BB'; ctx.font = '38px Arial';
+  ctx.fillText('O livro em minutos', W / 2, H * 0.80);
+
+  // Linha decorativa
+  ctx.fillStyle = p.acc; ctx.fillRect(W / 2 - 80, H * 0.84, 160, 3);
+
+  const out = join(outputDir, 'cenas', 'cena_00_intro.png');
+  await writeFile(out, await canvas.encode('png'));
+  return out;
+}
+
+// ── Card de CTA no final ──────────────────────────────────────────────────────
+async function gerarCenaCTA(roteiro, outputDir) {
+  const canvas = createCanvas(W, H);
+  const ctx    = canvas.getContext('2d');
+  const p      = PALETAS[6]; // dourado
+
+  // Fundo escuro com gradiente
+  const bg = ctx.createLinearGradient(0, 0, W, H);
+  bg.addColorStop(0, '#050510'); bg.addColorStop(1, '#100520');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+  // Brilho central
+  drawGlow(ctx, W / 2, H / 2, 500, hexToRgb(p.acc), 0.15);
+  drawLightRays(ctx, W / 2, H / 2, p.acc, 16, 600);
+
+  ctx.textAlign = 'center';
+
+  // Emoji principal
+  ctx.font = '80px Arial';
+  ctx.fillText('📚', W / 2 - 220, H * 0.28);
+  ctx.fillText('🔔', W / 2, H * 0.28);
+  ctx.fillText('💬', W / 2 + 220, H * 0.28);
+
+  // Título do CTA
+  ctx.fillStyle = p.acc; ctx.font = 'bold 62px Arial';
+  ctx.shadowColor = p.acc; ctx.shadowBlur = 20;
+  ctx.fillText('Gostou do resumo?', W / 2, H * 0.44);
+  ctx.shadowBlur = 0;
+
+  // Ações
+  ctx.fillStyle = '#FFFFFF'; ctx.font = '40px Arial';
+  ctx.fillText('▶  Se inscreva para mais resumos toda semana', W / 2, H * 0.56);
+  ctx.fillStyle = 'rgba(255,255,255,0.75)'; ctx.font = '36px Arial';
+  ctx.fillText('🔔  Ative o sino para não perder nenhum!', W / 2, H * 0.64);
+
+  // Linha de separação
+  ctx.fillStyle = p.acc; ctx.fillRect(W / 2 - 200, H * 0.70, 400, 2);
+
+  // Pergunta de engajamento
+  ctx.fillStyle = p.acc; ctx.font = 'bold 34px Arial';
+  ctx.fillText('💬 Qual livro você quer a seguir?', W / 2, H * 0.78);
+  ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.font = '28px Arial';
+  ctx.fillText('Comenta aqui embaixo!', W / 2, H * 0.84);
+
+  // Branding
+  ctx.fillStyle = p.acc + '66'; ctx.font = 'bold 24px Arial';
+  ctx.fillText('RESUMO FÁCIL • O livro em minutos', W / 2, H * 0.93);
+
+  const idx = roteiro.segmentos.length + 3;
+  const out = join(outputDir, 'cenas', `cena_${String(idx).padStart(2, '0')}_cta.png`);
+  await writeFile(out, await canvas.encode('png'));
+  return out;
+}
+
 // ── Export principal ──────────────────────────────────────────────────────
 export async function gerarTodasCenas(roteiro, outputDir, onProgress) {
   const cenasDir = join(outputDir, 'cenas');
   await ensureDir(cenasDir);
   const cenas = [];
   const total = roteiro.segmentos.length;
+
+  // Intro de 3 segundos com logo do canal
+  cenas.push(await gerarCenaIntro(roteiro, outputDir));
+  if (onProgress) onProgress();
 
   cenas.push(await gerarCenaAbertura(roteiro, outputDir));
   if (onProgress) onProgress();
@@ -527,6 +635,10 @@ export async function gerarTodasCenas(roteiro, outputDir, onProgress) {
   }
 
   cenas.push(await gerarCenaConclusao(roteiro, outputDir));
+  if (onProgress) onProgress();
+
+  // Card de CTA final (15s)
+  cenas.push(await gerarCenaCTA(roteiro, outputDir));
   if (onProgress) onProgress();
 
   return cenas;

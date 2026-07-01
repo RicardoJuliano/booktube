@@ -3,6 +3,7 @@ node_modules/
 output/
 assets/musica/
 assets/yt_tokens.json
+assets/tiktok_tokens.json
 assets/vozes.json
 *.mp3
 *.mp4

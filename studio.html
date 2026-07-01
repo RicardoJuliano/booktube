@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Resumo Fácil — BookNarrator Studio</title>
+<style>
+  :root {
+    --bg:      #0A0A0F; --surface: #111118; --card: #18181F; --border: #2A2A38;
+    --accent:  #F5A623; --accent2: #4FC3F7; --danger: #E94560; --success: #2ECC71;
+    --text:    #F0F0F8; --muted: #7A7A9A;
+    --font:    'Inter', system-ui, sans-serif;
+    --mono:    'JetBrains Mono', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; display: flex; flex-direction: column; }
+
+  header { display: flex; align-items: center; justify-content: space-between; padding: 18px 32px; border-bottom: 1px solid var(--border); background: var(--surface); position: sticky; top: 0; z-index: 100; }
+  .logo { display: flex; align-items: center; gap: 12px; }
+  .logo-icon { width: 36px; height: 36px; background: var(--accent); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+  .logo-text { display: flex; flex-direction: column; }
+  .logo-name { font-size: 15px; font-weight: 700; color: var(--text); }
+  .logo-sub  { font-size: 11px; color: var(--muted); }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+  .status-pill { font-size: 11px; font-family: var(--mono); padding: 4px 10px; border-radius: 20px; background: var(--card); border: 1px solid var(--border); color: var(--muted); transition: all 0.3s; }
+  .status-pill.ok   { color: var(--success); border-color: #2ECC7144; }
+  .status-pill.warn { color: var(--accent);  border-color: #F5A62344; }
+  .status-pill.err  { color: var(--danger);  border-color: #E9456044; }
+
+  main { display: grid; grid-template-columns: 1fr 400px; flex: 1; max-width: 1440px; width: 100%; margin: 0 auto; padding: 32px; gap: 28px; }
+
+  /* ── FORM ── */
+  .add-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 24px; margin-bottom: 20px; }
+  .add-title { font-size: 16px; font-weight: 600; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+  .add-title::before { content: ''; display: block; width: 3px; height: 18px; background: var(--accent); border-radius: 2px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+  .form-group input, .form-group select { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: var(--font); font-size: 14px; padding: 10px 14px; outline: none; transition: border-color 0.15s; }
+  .form-group input:focus { border-color: var(--accent); }
+  .form-group input::placeholder { color: var(--muted); }
+
+  .formats-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 14px; }
+  .fcheck { display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; cursor: pointer; user-select: none; transition: all 0.15s; }
+  .fcheck:hover { border-color: #F5A62366; }
+  .fcheck.on { border-color: var(--accent); background: #F5A62312; }
+  .fcheck input { display: none; }
+  .fcheck-label { font-size: 12px; font-weight: 600; }
+  .fcheck-sub   { font-size: 10px; color: var(--muted); display: block; }
+
+  .btn-add { width: 100%; padding: 12px; background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: 9px; font-size: 14px; font-weight: 600; font-family: var(--font); cursor: pointer; transition: all 0.15s; }
+  .btn-add:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── QUEUE ── */
+  .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .section-title  { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+  .count-badge    { font-size: 11px; font-family: var(--mono); color: var(--accent); background: #F5A62318; padding: 2px 8px; border-radius: 10px; }
+
+  .queue-list { display: flex; flex-direction: column; gap: 10px; }
+  .queue-empty { text-align: center; padding: 48px 24px; color: var(--muted); background: var(--card); border: 1px dashed var(--border); border-radius: 14px; font-size: 14px; }
+
+  .qitem { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; display: flex; align-items: flex-start; gap: 12px; animation: slideIn 0.2s ease; }
+  @keyframes slideIn { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
+  .qitem.running { border-color: #F5A62388; background: #F5A62306; }
+  .qitem.done    { border-color: #2ECC7166; background: #2ECC7106; }
+  .qitem.error   { border-color: #E9456066; background: #E9456006; }
+
+  .qitem-num  { width: 26px; height: 26px; border-radius: 6px; background: var(--surface); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; font-family: var(--mono); color: var(--muted); flex-shrink: 0; }
+  .qitem-info { flex: 1; min-width: 0; }
+  .qitem-title{ font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .qitem-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .qitem-tags { display: flex; gap: 4px; margin-top: 6px; }
+  .tag { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 4px; background: var(--surface); border: 1px solid var(--border); color: var(--muted); }
+  .tag.yt { color:#FF4444; border-color:#FF444433; background:#FF444412; }
+  .tag.sh { color:#FF8800; border-color:#FF880033; background:#FF880012; }
+  .tag.tt { color:#4FC3F7; border-color:#4FC3F733; background:#4FC3F712; }
+
+  .qitem-progress { width: 100%; height: 3px; background: var(--border); border-radius: 2px; margin-top: 8px; overflow: hidden; }
+  .qitem-bar      { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.5s ease; }
+  .qitem-status   { font-size: 11px; color: var(--muted); font-family: var(--mono); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .qitem-del { width: 28px; height: 28px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--muted); font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.15s; margin-top: 2px; }
+  .qitem-del:hover { border-color: var(--danger); color: var(--danger); }
+
+  /* ── SIDEBAR ── */
+  .sidebar { display: flex; flex-direction: column; gap: 20px; }
+  .scard   { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
+  .stitle  { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 16px; }
+
+  .btn-produce { width: 100%; padding: 16px; background: linear-gradient(135deg, var(--accent), #E8920F); color: #0A0A0F; border: none; border-radius: 10px; font-size: 15px; font-weight: 800; font-family: var(--font); cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 4px 20px #F5A62330; }
+  .btn-produce:hover   { opacity: 0.92; transform: translateY(-1px); box-shadow: 0 6px 28px #F5A62444; }
+  .btn-produce:disabled{ opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+  .btn-produce:active  { transform: scale(0.98); }
+  .btn-produce.running { background: linear-gradient(135deg, #E94560, #c72040); box-shadow: 0 4px 20px #E9456030; }
+
+  .voice-options { display: flex; flex-direction: column; gap: 8px; }
+  .voption { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); cursor: pointer; transition: all 0.15s; user-select: none; }
+  .voption:hover { border-color: #F5A62366; }
+  .voption.sel   { border-color: var(--accent); background: #F5A62312; }
+  .voption input { display: none; }
+  .vavatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; background: var(--card); flex-shrink: 0; }
+  .vname   { font-size: 13px; font-weight: 600; }
+  .vdesc   { font-size: 11px; color: var(--muted); }
+
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px; text-align: center; }
+  .stat-val { font-size: 22px; font-weight: 800; font-family: var(--mono); color: var(--accent); display: block; }
+  .stat-lbl { font-size: 11px; color: var(--muted); margin-top: 2px; display: block; }
+
+  /* ── LOG ── */
+  .log-box { background: var(--bg); border: 1px solid var(--border); border-radius: 9px; padding: 10px 12px; font-family: var(--mono); font-size: 11px; line-height: 1.7; height: 260px; overflow-y: auto; scroll-behavior: smooth; }
+  .log-line { display: flex; gap: 8px; }
+  .log-t { color: var(--muted); flex-shrink: 0; font-size: 10px; padding-top: 1px; }
+  .log-m { word-break: break-word; }
+  .log-m.info    { color: var(--text); }
+  .log-m.success { color: var(--success); }
+  .log-m.warn    { color: var(--accent); }
+  .log-m.err     { color: var(--danger); }
+  .log-m.step    { color: var(--accent2); font-weight: 700; }
+
+  @media (max-width: 900px) {
+    main { grid-template-columns: 1fr; padding: 16px; }
+    .form-row { grid-template-columns: 1fr; }
+    .formats-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">📚</div>
+    <div class="logo-text">
+      <span class="logo-name">Resumo Fácil</span>
+      <span class="logo-sub">BookNarrator Studio</span>
+    </div>
+  </div>
+  <div class="header-right">
+    <span class="status-pill" id="pillServer">⚪ Conectando...</span>
+    <span class="status-pill" id="pillPipeline">⚪ Ocioso</span>
+  </div>
+</header>
+
+<main>
+  <div>
+    <!-- Formulário -->
+    <div class="add-card">
+      <div class="add-title">Adicionar livro à fila</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Título do livro</label>
+          <input type="text" id="iLivro" placeholder="Ex: O Poder do Hábito" />
+        </div>
+        <div class="form-group">
+          <label>Autor</label>
+          <input type="text" id="iAutor" placeholder="Ex: Charles Duhigg" />
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom:14px">
+        <label>Produzir para</label>
+        <div class="formats-grid">
+          <label class="fcheck on" id="fc-youtube"><input type="checkbox" checked><span style="font-size:16px">▶️</span><div><span class="fcheck-label">YouTube</span><span class="fcheck-sub">Vídeo longo</span></div></label>
+          <label class="fcheck on" id="fc-shorts"><input type="checkbox" checked><span style="font-size:16px">📱</span><div><span class="fcheck-label">Shorts</span><span class="fcheck-sub">Cortes verticais</span></div></label>
+          <label class="fcheck on" id="fc-tiktok"><input type="checkbox" checked><span style="font-size:16px">🎵</span><div><span class="fcheck-label">TikTok</span><span class="fcheck-sub">Mesmo corte</span></div></label>
+        </div>
+      </div>
+
+      <button class="btn-add" onclick="addToQueue()">＋ Adicionar à fila</button>
+    </div>
+
+    <!-- Fila -->
+    <div class="section-header">
+      <span class="section-title">Fila de produção</span>
+      <span class="count-badge" id="qCount">0 livros</span>
+    </div>
+    <div class="queue-list" id="qList">
+      <div class="queue-empty">📚 Nenhum livro na fila ainda.</div>
+    </div>
+  </div>
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="scard">
+      <div class="stitle">Controle</div>
+      <button class="btn-produce" id="btnRun" onclick="togglePipeline()" disabled>
+        🚀 Iniciar Produção
+      </button>
+      <div id="runHint" style="margin-top:10px;font-size:11px;color:var(--muted);text-align:center">
+        Adicione livros à fila para começar
+      </div>
+    </div>
+
+    <div class="scard">
+      <div class="stitle">Voz da narração</div>
+      <div class="voice-options">
+        <label class="voption sel" id="v-rafael"><input type="radio" name="voz" value="pt-masculine-deep" checked><div class="vavatar">🎙️</div><div><div class="vname">Rafael</div><div class="vdesc">Masculino · Grave · Profissional</div></div></label>
+        <label class="voption" id="v-lucas"><input type="radio" name="voz" value="pt-masculine-young"><div class="vavatar">🤝</div><div><div class="vname">Lucas</div><div class="vdesc">Masculino · Jovem · Dinâmico</div></div></label>
+        <label class="voption" id="v-ana"><input type="radio" name="voz" value="pt-feminine-warm"><div class="vavatar">👩</div><div><div class="vname">Ana</div><div class="vdesc">Feminino · Caloroso · Didático</div></div></label>
+        <label class="voption" id="v-beatriz"><input type="radio" name="voz" value="pt-feminine-clear"><div class="vavatar">🎤</div><div><div class="vname">Beatriz</div><div class="vdesc">Feminino · Claro · Jornalístico</div></div></label>
+      </div>
+    </div>
+
+    <div class="scard">
+      <div class="stitle">Sessão</div>
+      <div class="stats-grid">
+        <div class="stat"><span class="stat-val" id="sTotal">0</span><span class="stat-lbl">Na fila</span></div>
+        <div class="stat"><span class="stat-val" id="sDone">0</span><span class="stat-lbl">Concluídos</span></div>
+        <div class="stat"><span class="stat-val" id="sStep">—</span><span class="stat-lbl">Etapa atual</span></div>
+        <div class="stat"><span class="stat-val" id="sTime">0s</span><span class="stat-lbl">Tempo total</span></div>
+      </div>
+    </div>
+
+    <div class="scard">
+      <div class="stitle" style="display:flex;justify-content:space-between;align-items:center">
+        Log em tempo real
+        <button onclick="clearLog()" style="font-size:10px;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--muted);padding:2px 8px;cursor:pointer">Limpar</button>
+      </div>
+      <div class="log-box" id="logBox"></div>
+    </div>
+  </aside>
+</main>
+
+<script>
+// ── Estado ─────────────────────────────────────────────────────────────────
+const S = {
+  queue:   [],
+  formats: { youtube: true, shorts: true, tiktok: true },
+  voice:   'pt-masculine-deep',
+  running: false,
+  done:    0,
+  step:    0,
+  total:   0,
+  startMs: 0,
+  timer:   null,
+};
+
+let evtSource = null;
+
+// ── SSE — conecta ao servidor ──────────────────────────────────────────────
+function conectar() {
+  if (evtSource) evtSource.close();
+
+  evtSource = new EventSource('/api/stream');
+
+  evtSource.onopen = () => {
+    pill('pillServer', 'ok', '🟢 Servidor OK');
+    log('Conectado ao BookNarrator Studio', 'success');
+  };
+
+  evtSource.onerror = () => {
+    pill('pillServer', 'err', '🔴 Servidor offline');
+    log('Servidor offline. Rode: node server.js', 'err');
+    setTimeout(conectar, 3000); // reconecta
+  };
+
+  evtSource.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    handleMsg(msg);
+  };
+}
+
+function handleMsg(msg) {
+  switch (msg.type) {
+    case 'connected':
+      if (msg.job) { S.running = true; updateBtn(); }
+      break;
+
+    case 'start':
+      S.running = true;
+      S.startMs = Date.now();
+      S.timer   = setInterval(updateTimer, 1000);
+      updateBtn();
+      pill('pillPipeline', 'warn', '⚙️ Produzindo...');
+      setItemStatus(0, 'running', 0, 'Iniciando...');
+      log(`▶ Iniciando: "${msg.job?.livro}"`, 'step');
+      break;
+
+    case 'output': {
+      const text = msg.text?.trim();
+      if (!text) break;
+
+      // Detecta etapa [N/M]
+      if (msg.step) {
+        S.step  = msg.step.step;
+        S.total = msg.step.total;
+        const pct = Math.round((S.step / S.total) * 100);
+        setItemStatus(0, 'running', pct, text.split('\n')[0].replace(/[^\w\s\.éàáãâêîóõôúüçÉÀÁÃÂÊÎÓÕÔÚÜÇ#→↑↓✔▶]/g, '').trim().slice(0, 60));
+        document.getElementById('sStep').textContent = `${S.step}/${S.total}`;
+      }
+
+      // Exibe no log (filtra linhas de progresso bar)
+      for (const line of text.split('\n')) {
+        const l = line.trim();
+        if (!l || l.match(/^[░█▒▓⣿⣾⣽]+/) || l.match(/^\d+%$/)) continue;
+        const type = l.includes('✔') ? 'success' : l.includes('❌') || l.includes('Erro') ? 'err' : l.includes('⚠') ? 'warn' : l.match(/^\[\d+\/\d+\]/) ? 'step' : 'info';
+        log(l, type);
+      }
+      break;
+    }
+
+    case 'done':
+      clearInterval(S.timer);
+      S.running = false;
+      if (msg.code === 0) {
+        S.done++;
+        setItemStatus(0, 'done', 100, 'Concluído!');
+        log(`✔ Vídeo gerado com sucesso!`, 'success');
+        pill('pillPipeline', 'ok', '✅ Concluído');
+        document.getElementById('sDone').textContent = S.done;
+        // Remove da fila após concluir
+        setTimeout(() => { S.queue.shift(); renderQueue(); updateBtn(); }, 2000);
+      } else {
+        setItemStatus(0, 'error', 0, `Erro (código ${msg.code})`);
+        log(`❌ Pipeline encerrou com erro (código ${msg.code})`, 'err');
+        pill('pillPipeline', 'err', '❌ Erro');
+      }
+      updateBtn();
+      break;
+
+    case 'stopped':
+      clearInterval(S.timer);
+      S.running = false;
+      setItemStatus(0, 'pending', 0, 'Interrompido');
+      log('Pipeline interrompido pelo usuário.', 'warn');
+      pill('pillPipeline', 'warn', '⏸ Parado');
+      updateBtn();
+      break;
+
+    case 'error':
+      clearInterval(S.timer);
+      S.running = false;
+      log(`❌ ${msg.message}`, 'err');
+      updateBtn();
+      break;
+  }
+}
+
+// ── Adicionar livro ────────────────────────────────────────────────────────
+function addToQueue() {
+  const livro = document.getElementById('iLivro').value.trim();
+  const autor = document.getElementById('iAutor').value.trim();
+  if (!livro || !autor) {
+    ['iLivro','iAutor'].forEach(id => {
+      const el = document.getElementById(id);
+      el.style.borderColor = 'var(--danger)';
+      setTimeout(() => el.style.borderColor = '', 1500);
+    });
+    return;
+  }
+  S.queue.push({ id: Date.now(), livro, autor, formats: {...S.formats}, status: 'pending', progress: 0, statusText: 'Aguardando' });
+  document.getElementById('iLivro').value = '';
+  document.getElementById('iAutor').focus();
+  renderQueue(); updateBtn();
+  log(`Adicionado: "${livro}" de ${autor}`, 'success');
+}
+
+function removeItem(id) {
+  S.queue = S.queue.filter(i => i.id !== id);
+  renderQueue(); updateBtn();
+}
+
+function renderQueue() {
+  const list = document.getElementById('qList');
+  document.getElementById('qCount').textContent = `${S.queue.length} ${S.queue.length === 1 ? 'livro' : 'livros'}`;
+  document.getElementById('sTotal').textContent = S.queue.length;
+
+  if (!S.queue.length) {
+    list.innerHTML = '<div class="queue-empty">📚 Nenhum livro na fila ainda.</div>';
+    return;
+  }
+
+  list.innerHTML = S.queue.map((item, i) => `
+    <div class="qitem ${item.status}" id="qi-${item.id}">
+      <div class="qitem-num">${i+1}</div>
+      <div class="qitem-info">
+        <div class="qitem-title">${item.livro}</div>
+        <div class="qitem-meta">${item.autor}</div>
+        <div class="qitem-tags">
+          ${item.formats.youtube ? '<span class="tag yt">YT</span>' : ''}
+          ${item.formats.shorts  ? '<span class="tag sh">Shorts</span>' : ''}
+          ${item.formats.tiktok  ? '<span class="tag tt">TikTok</span>' : ''}
+        </div>
+        <div class="qitem-progress"><div class="qitem-bar" id="bar-${item.id}" style="width:${item.progress}%"></div></div>
+        <div class="qitem-status" id="st-${item.id}">${item.statusText}</div>
+      </div>
+      ${item.status !== 'running' ? `<button class="qitem-del" onclick="removeItem(${item.id})">✕</button>` : ''}
+    </div>`).join('');
+}
+
+function setItemStatus(idx, status, pct, text) {
+  if (!S.queue[idx]) return;
+  S.queue[idx].status     = status;
+  S.queue[idx].progress   = pct;
+  S.queue[idx].statusText = text;
+  const bar = document.getElementById(`bar-${S.queue[idx].id}`);
+  const st  = document.getElementById(`st-${S.queue[idx].id}`);
+  const el  = document.getElementById(`qi-${S.queue[idx].id}`);
+  if (bar) bar.style.width = pct + '%';
+  if (st)  st.textContent  = text;
+  if (el)  { el.className = 'qitem ' + status; }
+}
+
+// ── Controle de produção ───────────────────────────────────────────────────
+function togglePipeline() {
+  if (S.running) {
+    fetch('/api/stop', { method: 'POST' });
+  } else {
+    if (!S.queue.length) return;
+    const item = S.queue[0];
+    const voz  = document.querySelector('input[name="voz"]:checked')?.value || 'pt-masculine-deep';
+    const cortes = item.formats.shorts || item.formats.tiktok;
+    fetch('/api/run', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ livro: item.livro, autor: item.autor, voz, cortes }),
+    }).then(r => {
+      if (!r.ok) r.json().then(d => log(`❌ ${d.error}`, 'err'));
+    });
+  }
+}
+
+function updateBtn() {
+  const btn  = document.getElementById('btnRun');
+  const hint = document.getElementById('runHint');
+  if (S.running) {
+    btn.disabled   = false;
+    btn.className  = 'btn-produce running';
+    btn.textContent = '⏹ Parar';
+    hint.textContent = 'Clique para interromper o pipeline';
+  } else if (S.queue.length) {
+    btn.disabled   = false;
+    btn.className  = 'btn-produce';
+    btn.innerHTML  = '🚀 Iniciar Produção';
+    hint.textContent = `Vai processar: "${S.queue[0].livro}"`;
+  } else {
+    btn.disabled   = true;
+    btn.className  = 'btn-produce';
+    btn.innerHTML  = '🚀 Iniciar Produção';
+    hint.textContent = 'Adicione livros à fila para começar';
+  }
+}
+
+// ── Formato checkboxes ─────────────────────────────────────────────────────
+document.querySelectorAll('.fcheck').forEach(el => {
+  el.addEventListener('click', () => {
+    const cb = el.querySelector('input');
+    cb.checked = !cb.checked;
+    el.classList.toggle('on', cb.checked);
+    const k = el.id.replace('fc-', '');
+    S.formats[k] = cb.checked;
+  });
+});
+
+// ── Vozes ──────────────────────────────────────────────────────────────────
+document.querySelectorAll('.voption').forEach(el => {
+  el.addEventListener('click', () => {
+    document.querySelectorAll('.voption').forEach(v => v.classList.remove('sel'));
+    el.classList.add('sel');
+    S.voice = el.querySelector('input').value;
+  });
+});
+
+// ── Enter shortcuts ────────────────────────────────────────────────────────
+document.getElementById('iLivro').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('iAutor').focus(); });
+document.getElementById('iAutor').addEventListener('keydown', e => { if (e.key === 'Enter') addToQueue(); });
+
+// ── Log helpers ────────────────────────────────────────────────────────────
+function log(msg, type = 'info') {
+  const box = document.getElementById('logBox');
+  const t   = new Date();
+  const ts  = `${pad(t.getHours())}:${pad(t.getMinutes())}:${pad(t.getSeconds())}`;
+  const el  = document.createElement('div');
+  el.className = 'log-line';
+  el.innerHTML = `<span class="log-t">${ts}</span><span class="log-m ${type}">${escHtml(msg)}</span>`;
+  box.appendChild(el);
+  box.scrollTop = box.scrollHeight;
+}
+function clearLog() { document.getElementById('logBox').innerHTML = ''; }
+function pad(n) { return String(n).padStart(2,'0'); }
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function pill(id, cls, txt) { const el = document.getElementById(id); el.className = `status-pill ${cls}`; el.textContent = txt; }
+
+function updateTimer() {
+  const s = Math.round((Date.now() - S.startMs) / 1000);
+  document.getElementById('sTime').textContent = s < 60 ? `${s}s` : `${Math.floor(s/60)}m${pad(s%60)}s`;
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+conectar();
+updateBtn();
+log('BookNarrator Studio pronto. Rode "node server.js" se não estiver conectado.', 'info');
+</script>
+</body>
+</html>

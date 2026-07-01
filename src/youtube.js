@@ -19,7 +19,7 @@ function oauth2Client() {
   return new google.auth.OAuth2(id, secret, REDIRECT_URI);
 }
 
-async function getAuth() {
+export async function getAuth() {
   const auth = oauth2Client();
   if (!existsSync(TOKENS_FILE))
     throw new Error('Canal não autenticado. Execute primeiro: node setup-youtube.js');
@@ -106,7 +106,7 @@ export async function atualizarDescricaoCanal(descricao) {
 }
 
 // ── Upload do vídeo ──────────────────────────────────────────────────────
-export async function uploadParaYoutube(videoPath, thumbnailPath, metadataPath, roteiro, onProgress) {
+export async function uploadParaYoutube(videoPath, thumbnailPath, metadataPath, roteiro, onProgress, publicar = false) {
   const auth     = await getAuth();
   const youtube  = google.youtube({ version: 'v3', auth });
   const metadata = JSON.parse(readFileSync(metadataPath, 'utf-8'));
@@ -130,7 +130,7 @@ export async function uploadParaYoutube(videoPath, thumbnailPath, metadataPath, 
           defaultAudioLanguage:'pt',
         },
         status: {
-          privacyStatus:            'public',
+          privacyStatus:            publicar ? 'public' : 'private',
           selfDeclaredMadeForKids:  false,
           madeForKids:              false,
         },
@@ -161,6 +161,16 @@ export async function uploadParaYoutube(videoPath, thumbnailPath, metadataPath, 
   }
 
   if (onProgress) onProgress(100);
+
+  const studioUrl = `https://studio.youtube.com/video/${videoId}/edit`;
+  if (!publicar) {
+    console.log('\n      ───────────────────────────────────────────');
+    console.log('      ✔ Vídeo enviado como RASCUNHO PRIVADO');
+    console.log(`\n      📺 Revise e publique aqui:\n         ${studioUrl}`);
+    console.log('      ───────────────────────────────────────────');
+    exec(process.platform === 'win32' ? `start "" "${studioUrl}"` : `open "${studioUrl}"`);
+  }
+
   return `https://youtu.be/${videoId}`;
 }
 

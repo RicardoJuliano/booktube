@@ -34,26 +34,49 @@ const KB = [
   (d) => `zoompan=z='1.10':d=${frames(d)}:x='iw/2-(iw/zoom/2)':y='(ih-ih/zoom)*on/${frames(d)}':s=1920x1080:fps=30`,
 ];
 
+// Transições xfade variadas — mais cinematográficas que fade igual em todas as trocas
+// Abertura → seg0 e seg_final → conclusão usam fadeblack (mais impactante)
+// Demais alternam deterministicamente baseadas no índice da cena
+const XFADE_TYPES = ['fade', 'fadeblack', 'slideleft', 'smoothleft', 'circleopen', 'wipeleft', 'dissolve'];
+function escolherTransicao(idx, total) {
+  if (idx === 1)         return { tipo: 'fadeblack', dur: 0.8 };  // abertura → primeiro segmento
+  if (idx === total - 1) return { tipo: 'fadeblack', dur: 0.7 };  // último segmento → conclusão
+  return { tipo: XFADE_TYPES[idx % XFADE_TYPES.length], dur: 0.4 };
+}
+
 function frames(d) { return Math.max(Math.ceil(d * 30), 2); }
+
+const isVideo = (p) => /\.(mp4|mov|webm)$/i.test(p);
 
 /**
  * Calcula a duração de cada cena com base nos blocos de legenda
  * (mesma distribuição por contagem de chars, sincronizada com legenda.js)
  */
-function duracoesDasCenas(roteiro, duracaoTotal) {
+const DURACAO_INTRO = 3;   // slide de intro (logo do canal)
+const DURACAO_CTA   = 15;  // card de call-to-action final
+
+function duracoesDasCenas(cenas, roteiro, duracaoTotal) {
   const blocos = calcularTimings(roteiro, duracaoTotal);
-  // blocos: [gancho, seg0, seg1, ..., segN-1, conclusao]
-  // cenas:  [abertura, seg0, seg1, ..., segN-1, conclusao]
-  // A cena de abertura cobre o bloco do gancho
-  const duracoes = blocos.map(b => Math.max(b.fim - b.inicio, 2));
-  return duracoes; // 1 cena por bloco, na mesma ordem
+  // blocos: [gancho, seg0, ..., segN-1, conclusao]
+  // cenas geradas: [intro, abertura, seg0, ..., segN-1, conclusao, cta]
+  // Intro e CTA têm duração fixa; os demais são proporcionais ao timing real
+  const duracoesProporcional = blocos.map(b => Math.max(b.fim - b.inicio, 2));
+
+  const temIntro = cenas.length > roteiro.segmentos.length + 2 && cenas[0]?.includes('intro');
+  const temCTA   = cenas.length > roteiro.segmentos.length + 2 && cenas[cenas.length - 1]?.includes('cta');
+
+  const duracoes = [];
+  if (temIntro) duracoes.push(DURACAO_INTRO);
+  duracoes.push(...duracoesProporcional);
+  if (temCTA)   duracoes.push(DURACAO_CTA);
+  return duracoes;
 }
 
 export async function composarVideo(cenas, assPath, narracao, musicaPath, outputDir, roteiro, onProgress) {
   if (!verificarFFmpeg()) throw new Error('❌ FFmpeg não encontrado. Instale em https://ffmpeg.org/download.html');
 
   const duracaoTotal = await detectarDuracaoMP3(narracao);
-  const duracoes     = duracoesDasCenas(roteiro, duracaoTotal);
+  const duracoes     = duracoesDasCenas(cenas, roteiro, duracaoTotal);
   const temMusica    = musicaPath && existsSync(musicaPath);
   const outputPath   = join(outputDir, 'video_final.mp4');
 
@@ -65,43 +88,53 @@ export async function composarVideo(cenas, assPath, narracao, musicaPath, output
   return new Promise((resolveP, rejectP) => {
     const cmd = ffmpeg();
 
-    // Um input por cena (imagem em loop)
-    cenas.forEach(c => cmd.input(c).inputOptions(['-loop 1']));
+    // Um input por cena (imagem em loop, ou clipe animado do Higgsfield em loop)
+    cenas.forEach(c => {
+      if (isVideo(c)) cmd.input(c).inputOptions(['-stream_loop -1']);
+      else cmd.input(c).inputOptions(['-loop 1']);
+    });
     cmd.input(narracao);
     if (temMusica) cmd.input(musicaPath);
 
     const numCenas  = cenas.length;
     const audioNIdx = numCenas;
     const audioMIdx = temMusica ? numCenas + 1 : -1;
-    const FADE      = 0.5;
-
     const filters = [];
 
-    // Ken Burns em cada cena
+    // Ken Burns em imagens estáticas; clipes animados do Higgsfield só recebem scale/crop
     for (let i = 0; i < numCenas; i++) {
       const dur = duracoes[i] || 5;
-      filters.push(
-        `[${i}:v]trim=duration=${dur.toFixed(2)},${KB[i % KB.length](dur)},setsar=1[kb${i}]`
-      );
+      if (isVideo(cenas[i])) {
+        filters.push(
+          `[${i}:v]trim=duration=${dur.toFixed(2)},setpts=PTS-STARTPTS,scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,setsar=1,fps=30[kb${i}]`
+        );
+      } else {
+        filters.push(
+          `[${i}:v]trim=duration=${dur.toFixed(2)},${KB[i % KB.length](dur)},setsar=1[kb${i}]`
+        );
+      }
     }
 
-    // Encadeia todas as cenas com xfade (fade entre cenas)
+    // Encadeia todas as cenas com xfade — transições variadas por posição
     if (numCenas === 1) {
       filters.push(`[kb0]copy[vpre]`);
     } else {
-      let offset = (duracoes[0] || 5) - FADE;
+      const t0 = escolherTransicao(1, numCenas);
+      let offset = (duracoes[0] || 5) - t0.dur;
       let prev   = 'kb0';
       for (let i = 1; i < numCenas; i++) {
+        const { tipo, dur } = escolherTransicao(i, numCenas);
         const out = i === numCenas - 1 ? 'vpre' : `xf${i}`;
-        filters.push(`[${prev}][kb${i}]xfade=transition=fade:duration=${FADE}:offset=${offset.toFixed(2)}[${out}]`);
-        offset += (duracoes[i] || 5) - FADE;
+        filters.push(`[${prev}][kb${i}]xfade=transition=${tipo}:duration=${dur}:offset=${offset.toFixed(2)}[${out}]`);
+        offset += (duracoes[i] || 5) - dur;
         prev = out;
       }
     }
 
-    // Overlays as legendas (texto animado) sobre o vídeo final
+    // Legendas + barra de progresso temporal (faixa fina que avança com o vídeo)
     filters.push(
-      `[vpre]subtitles='${assEsc}':force_style='FontName=Arial,Bold=1,FontSize=96,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,Outline=5,Shadow=3,Alignment=5,MarginV=80'[vout]`
+      `[vpre]subtitles='${assEsc}':force_style='FontName=Arial,Bold=1,FontSize=54,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BackColour=&H99000000,BorderStyle=3,Outline=2,Shadow=1,Alignment=2,MarginV=300'[vsub]`,
+      `[vsub]drawbox=x=0:y=1072:w='iw*t/${duracaoTotal.toFixed(0)}':h=8:color=#F5A623@0.85:t=fill[vout]`
     );
 
     // Mixagem de áudio

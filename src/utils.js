@@ -1,10 +1,6 @@
 import { execSync } from 'child_process';
 import { mkdirSync, existsSync } from 'fs';
-import { readFile } from 'fs/promises';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
+import { join } from 'path';
 
 export function slugify(text) {
   return text
@@ -64,13 +60,27 @@ export function verificarFFmpeg() {
   }
 }
 
-export async function carregarCores() {
-  const coresPath = join(__dirname, '..', 'assets', 'template', 'cores.json');
-  const data = await readFile(coresPath, 'utf-8');
-  return JSON.parse(data);
-}
-
 export function formatFileSize(bytes) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/**
+ * Resolves the background music track to use, in order of preference:
+ * 1. <livro-autor-slug>.mp3 (per-book specific)
+ * 2. <livro-slug>.mp3 (per-title without author)
+ * 3. background.mp3 (generic fallback)
+ * 4. null (no music — pipeline continues without it)
+ */
+export function resolverMusica(livro, autor, pasta = './assets/musica') {
+  const candidatos = [
+    slugify(`${livro} ${autor}`),
+    slugify(livro),
+    'background',
+  ];
+  for (const nome of candidatos) {
+    const p = join(pasta, `${nome}.mp3`);
+    if (existsSync(p)) return p;
+  }
+  return null;
 }

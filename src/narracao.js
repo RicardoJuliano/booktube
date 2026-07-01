@@ -95,14 +95,23 @@ async function resolverVozId(vozAmigavel) {
   throw new Error(`❌ Voz "${vozAmigavel}" não encontrada. Use --listar-vozes para ver as disponíveis.`);
 }
 
+// ⚠️ INVARIANTE CRÍTICO: a ordem e os breaks aqui DEVEM espelhar
+// calcularTimings() em src/legenda.js — ambos derivam o timeline a partir
+// da mesma estrutura. Alterar um exige alterar o outro.
+// Estrutura: [gancho_7s + gancho] <break 1.5s> [seg + transicao] <break 1.0s> ... <break 1.5s> conclusao
 function construirTextoNarracao(roteiro) {
   const partes = [];
 
-  partes.push(roteiro.gancho);
+  // Bloco do gancho: gancho_7s (se existir) + gancho de expansão
+  const ganchoTexto = [roteiro.gancho_7s, roteiro.gancho].filter(Boolean).join('\n\n');
+  partes.push(ganchoTexto);
   partes.push('<break time="1.5s"/>');
 
   for (let i = 0; i < roteiro.segmentos.length; i++) {
-    partes.push(roteiro.segmentos[i].texto_narrado);
+    const seg = roteiro.segmentos[i];
+    // Bloco do segmento: texto narrado + open loop de transição (se existir)
+    const segTexto = [seg.texto_narrado, seg.transicao_para_proximo].filter(Boolean).join('\n\n');
+    partes.push(segTexto);
     if (i < roteiro.segmentos.length - 1) {
       partes.push('<break time="1.0s"/>');
     }
